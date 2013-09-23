@@ -23,8 +23,7 @@ class NetiTestBase(unittest.TestCase):
             self.conn = neti.Connection()
 
     def tearDown(self):
-        self.conn.local_zk.retry(self.conn.local_zk.delete, TESTING_CHROOT, recursive=True)
-        self.conn.remote_zk.retry(self.conn.remote_zk.delete, TESTING_CHROOT, recursive=True)
+        self.conn.zk.retry(self.conn.zk.delete, TESTING_CHROOT, recursive=True)
 
 
 class NetiEC2Tests(NetiTestBase):
@@ -32,10 +31,10 @@ class NetiEC2Tests(NetiTestBase):
     def test_register_in_EC2(self):
         registry = neti.Registry(self.conn)
         ip = registry.register()
-        self.assertEquals(IPv4Network(unicode(self.conn.ec2_overlay_subnet)), self.conn.network)
+        self.assertEquals(IPv4Network(unicode(self.conn.overlay_subnet)), self.conn.network)
         self.assertIn(IPv4Address(unicode(ip)), self.conn.network)
-        ip_to_id = self.conn.local_zk.get(registry._zk_ip_path(ip))[0]
-        id_to_ip = self.conn.local_zk.get(registry._zk_id_path)[0]
+        ip_to_id = self.conn.zk.get(registry._zk_ip_path(ip))[0]
+        id_to_ip = self.conn.zk.get(registry._zk_id_path)[0]
         self.assertEquals(self.conn.instance_id, ip_to_id)
         self.assertEquals(ip, id_to_ip)
 
@@ -46,10 +45,10 @@ class NetiVPCTests(NetiTestBase):
     def test_register_in_VPC(self):
         registry = neti.Registry(self.conn)
         ip = registry.register()
-        self.assertEquals(IPv4Network(unicode(self.conn.vpc_overlay_subnet)), self.conn.network)
+        self.assertEquals(IPv4Network(unicode(self.conn.overlay_subnet)), self.conn.network)
         self.assertIn(IPv4Address(unicode(ip)), self.conn.network)
-        ip_to_id = self.conn.local_zk.get(registry._zk_ip_path(ip))[0]
-        id_to_ip = self.conn.local_zk.get(registry._zk_id_path)[0]
+        ip_to_id = self.conn.zk.get(registry._zk_ip_path(ip))[0]
+        id_to_ip = self.conn.zk.get(registry._zk_id_path)[0]
         self.assertEquals(self.conn.instance_id, ip_to_id)
         self.assertEquals(ip, id_to_ip)
 
@@ -99,9 +98,9 @@ class NetiIPtablesTests(NetiTestBase):
             "4d8e8617c68a46f89ceaef5bba33b3c0-32.32.32.33|10.8.2.2|192.168.0.2|0",
             "46a30a0bd5a44e7899a87f08ad79e6ff-32.32.32.34|10.8.2.3|192.168.0.3|1"
         ]
-        self.conn.local_zk.ensure_path(self.registry.zk_ip_map_path)
+        self.conn.zk.ensure_path(self.registry.zk_ip_map_path)
         for entry in entries:
-            self.conn.local_zk.create("%s/%s" % (self.registry.zk_ip_map_path, entry))
+            self.conn.zk.create("%s/%s" % (self.registry.zk_ip_map_path, entry))
 
         def return_temp(temp):
             temp.seek(0)
@@ -111,7 +110,7 @@ class NetiIPtablesTests(NetiTestBase):
 
     def build_file(self):
         self.build_ip_maps()
-        entries = self.conn.local_zk.get_children(self.registry.zk_ip_map_path)
+        entries = self.conn.zk.get_children(self.registry.zk_ip_map_path)
         builder = neti.IPtables(is_vpc=False, dry_run=True)
         builder.build(entries)
 
@@ -127,10 +126,17 @@ class NetiIPtablesTests(NetiTestBase):
         self.build_file()
         self.assertEquals(reject_all, "-j DROP" in self.tempfile)
 
-    def test_open_80(self):
-        open_80 = neti.config.getboolean("neti", "open_80")
+    def test_open_ports(self):
+        open_ports = neti.config.get("neti", "open_ports").split(",")
         self.build_file()
-        self.assertEquals(open_80, "dport 80" in self.tempfile)
+        for port in open_ports:
+            self.assertTrue("dport %s" % port in self.tempfile)
+
+    def test_nat_overrides(self):
+        nat_overrides = neti.config.items("nat_overrides")
+        self.build_file()
+        for nat in nat_overrides:
+            self.assertIn(nat[0], self.tempfile)
 
 
 def main():
