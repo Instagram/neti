@@ -8,7 +8,7 @@ Currently, Neti works on Ubuntu/Debian, but should work on many more platforms w
 Neti is buildable as a pip package.
 
 ## Deploying and Using Neti
-Neti should be installed using a configuration management solution like Chef. In fact, there is also [neti-cookbook](https://github.com/Instagram/neti-cookbook neti-cookbook) which you can use as a template to install Neti in your infrastructure.
+Neti should be installed using a configuration management solution like Chef. In fact, there is also [neti-cookbook](https://github.com/Instagram/neti-cookbook) which you can use as a template to install Neti in your infrastructure.
 
 Neti is provided as-is, and, while it worked wonders for Instagram's EC2-VPC migration, it is tailored for our use, and may not work for you without a number of tweaks. Here are some of the major considerations for making this work in your infrastructure:
 
